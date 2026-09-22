@@ -14,6 +14,25 @@ export const admins = sqliteTable("admins", {
   ...timestamps,
 }, (table) => [uniqueIndex("idx_admins_email").on(table.email)]);
 
+export const adminSessions = sqliteTable("admin_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  adminId: integer("admin_id").notNull().references(() => admins.id),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  ...timestamps,
+}, (table) => [uniqueIndex("idx_admin_sessions_token_hash").on(table.tokenHash), index("idx_admin_sessions_admin_id").on(table.adminId)]);
+
+export const passwordResetCodes = sqliteTable("password_reset_codes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  adminId: integer("admin_id").notNull().references(() => admins.id),
+  codeHash: text("code_hash").notNull(),
+  codeSalt: text("code_salt").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  attempts: integer("attempts").notNull().default(0),
+  ...timestamps,
+}, (table) => [index("idx_password_reset_admin_expiry").on(table.adminId, table.expiresAt)]);
+
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -87,6 +106,7 @@ export const storeSettings = sqliteTable("store_settings", {
   storeLogo: text("store_logo"),
   storeAddress: text("store_address"),
   storePhone: text("store_phone"),
+  whatsappNumber: text("whatsapp_number").notNull().default(""),
   storeEmail: text("store_email"),
   invoiceNote: text("invoice_note").notNull().default("Dokumen ini merupakan bukti pembelian yang sah"),
   ...timestamps,
