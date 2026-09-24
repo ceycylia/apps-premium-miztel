@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, payments } from "@/db/schema";
 import { isSuccessfulPayment, type MidtransNotification, verifyMidtransSignature } from "@/lib/midtrans";
+import { createInvoicePublicId } from "@/lib/invoice";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const paymentStatus = paid ? "paid" : notification.transaction_status;
     const paidAt = paid ? (notification.settlement_time ?? new Date().toISOString()) : null;
     await db.batch([
-      db.update(orders).set({ paymentStatus, orderStatus: paid ? "lunas" : order.orderStatus, paidAt, updatedAt: sqlNow() }).where(eq(orders.id, order.id)),
+      db.update(orders).set({ invoicePublicId: paid ? (order.invoicePublicId || createInvoicePublicId()) : order.invoicePublicId, paymentStatus, orderStatus: paid ? "lunas" : order.orderStatus, paidAt, updatedAt: sqlNow() }).where(eq(orders.id, order.id)),
       db.insert(payments).values({ orderId: order.id, provider: "midtrans", transactionId: notification.transaction_id, paymentType: notification.payment_type, grossAmount: Math.round(Number(notification.gross_amount)), paymentStatus, rawResponse: notification, paidAt }),
     ]);
     return Response.json({ received: true });

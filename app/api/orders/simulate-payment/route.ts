@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orderItems, orders, payments } from "@/db/schema";
+import { createInvoicePublicId } from "@/lib/invoice";
 
 export async function POST(request: Request) {
   if (process.env.NODE_ENV === "production") {
@@ -20,9 +21,11 @@ export async function POST(request: Request) {
     if (order.paymentStatus !== "paid") {
       const paidAt = new Date().toISOString();
       const invoiceNumber = order.invoiceNumber || order.orderNumber.replace(/^ORD-/, "INV-");
+      const invoicePublicId = order.invoicePublicId || createInvoicePublicId();
       await db.batch([
         db.update(orders).set({
           invoiceNumber,
+          invoicePublicId,
           paymentStatus: "paid",
           orderStatus: "lunas",
           paidAt,

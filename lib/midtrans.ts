@@ -17,12 +17,19 @@ function serverKey() {
   return env.MIDTRANS_SERVER_KEY;
 }
 
+export type MidtransItemDetail = { id: string; name: string; price: number; quantity: number };
+
 export async function createSnapTransaction(payload: {
   orderId: string;
   grossAmount: number;
-  itemName: string;
+  itemName?: string;
+  itemDetails?: MidtransItemDetail[];
   customer: { firstName: string; email?: string; phone: string };
 }) {
+  const itemDetails = payload.itemDetails?.length
+    ? payload.itemDetails.map((item) => ({ ...item, name: item.name.slice(0, 50) }))
+    : [{ id: payload.orderId, price: payload.grossAmount, quantity: 1, name: (payload.itemName ?? payload.orderId).slice(0, 50) }];
+
   const production = env.MIDTRANS_IS_PRODUCTION === "true";
   const endpoint = production ? "https://app.midtrans.com/snap/v1/transactions" : "https://app.sandbox.midtrans.com/snap/v1/transactions";
   const response = await fetch(endpoint, {
@@ -31,7 +38,7 @@ export async function createSnapTransaction(payload: {
     body: JSON.stringify({
       transaction_details: { order_id: payload.orderId, gross_amount: payload.grossAmount },
       enabled_payments: ["qris"],
-      item_details: [{ id: payload.orderId, price: payload.grossAmount, quantity: 1, name: payload.itemName.slice(0, 50) }],
+      item_details: itemDetails,
       customer_details: { first_name: payload.customer.firstName, email: payload.customer.email, phone: payload.customer.phone },
     }),
   });

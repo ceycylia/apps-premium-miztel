@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, payments } from "@/db/schema";
 import { getAuthenticatedAdmin } from "@/lib/admin-auth";
+import { createInvoicePublicId } from "@/lib/invoice";
 
 const statuses = ["menunggu_pembayaran", "lunas", "diproses", "selesai", "dibatalkan"];
 
@@ -17,7 +18,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const now = new Date().toISOString();
     if (body.confirmPayment) {
       await db.batch([
-        db.update(orders).set({ paymentStatus: "paid", orderStatus: "lunas", paidAt: now, updatedAt: now }).where(eq(orders.id, id)),
+        db.update(orders).set({ invoicePublicId: order.invoicePublicId || createInvoicePublicId(), paymentStatus: "paid", orderStatus: "lunas", paidAt: order.paidAt || now, updatedAt: now }).where(eq(orders.id, id)),
         db.insert(payments).values({ orderId: id, provider: "manual", paymentType: "manual_confirmation", grossAmount: order.total, feeAmount: order.paymentFee, paymentStatus: "paid", paidAt: now }),
       ]);
     } else if (body.orderStatus) await db.update(orders).set({ orderStatus: body.orderStatus, updatedAt: now }).where(eq(orders.id, id));

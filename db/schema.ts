@@ -58,6 +58,7 @@ export const orders = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   orderNumber: text("order_number").notNull(),
   invoiceNumber: text("invoice_number").notNull(),
+  invoicePublicId: text("invoice_public_id"),
   buyerName: text("buyer_name").notNull(),
   buyerWhatsapp: text("buyer_whatsapp").notNull(),
   buyerEmail: text("buyer_email"),
@@ -72,7 +73,7 @@ export const orders = sqliteTable("orders", {
   orderStatus: text("order_status").notNull().default("menunggu_pembayaran"),
   paidAt: text("paid_at"),
   ...timestamps,
-}, (table) => [uniqueIndex("idx_orders_order_number").on(table.orderNumber), uniqueIndex("idx_orders_invoice_number").on(table.invoiceNumber), index("idx_orders_payment_status_created").on(table.paymentStatus, table.createdAt), index("idx_orders_order_status_created").on(table.orderStatus, table.createdAt)]);
+}, (table) => [uniqueIndex("idx_orders_order_number").on(table.orderNumber), uniqueIndex("idx_orders_invoice_number").on(table.invoiceNumber), uniqueIndex("idx_orders_invoice_public_id").on(table.invoicePublicId), index("idx_orders_payment_status_created").on(table.paymentStatus, table.createdAt), index("idx_orders_order_status_created").on(table.orderStatus, table.createdAt)]);
 
 export const orderItems = sqliteTable("order_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
