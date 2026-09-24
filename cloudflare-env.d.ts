@@ -8,6 +8,5 @@ declare namespace Cloudflare {
     CLOUDFLARE_EMAIL_TOKEN?: string;
     RESET_FROM_EMAIL?: string;
     RESET_EMAIL_DEV_MODE?: string;
-    COMMERCE_CLEANUP_TOKEN?: string;
   }
 }
