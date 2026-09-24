@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Clock3, Download, Headphones, LayoutGrid, MessageCircle, Minus, Play, Plus, Printer, QrCode, Search, ShieldCheck, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, Clock3, Download, Headphones, LayoutGrid, MessageCircle, Minus, Play, Plus, Printer, QrCode, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -48,6 +48,22 @@ function loadCart(): CartItem[] {
 function saveCart(items: CartItem[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+}
+
+function addCartItem(items: CartItem[], product: Product, variant: Variant) {
+  const existing = items.find((item) => item.variantId === variant.id);
+  if (existing) return items.map((item) => item.variantId === variant.id ? { ...item, quantity: Math.min(99, item.quantity + 1) } : item);
+  return [...items, {
+    variantId: variant.id,
+    productId: product.id,
+    productName: product.name,
+    variantName: variant.variantName,
+    durationLabel: variant.durationLabel,
+    price: variant.price,
+    quantity: 1,
+    imageUrl: product.imageUrl,
+    category: product.category,
+  }];
 }
 
 function cartVariantLabel(item: Pick<CartItem, "variantName" | "durationLabel">) {
@@ -152,25 +168,16 @@ export default function StorefrontClient() {
   const openProduct = (product: Product) => { setSelected(product); setVariantId(product.variants[0]?.id ?? 0); };
 
   function addToCart(product: Product, variant: Variant) {
-    setCart((current) => {
-      const existing = current.find((item) => item.variantId === variant.id);
-      if (existing) {
-        return current.map((item) => item.variantId === variant.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...current, {
-        variantId: variant.id,
-        productId: product.id,
-        productName: product.name,
-        variantName: variant.variantName,
-        durationLabel: variant.durationLabel,
-        price: variant.price,
-        quantity: 1,
-        imageUrl: product.imageUrl,
-        category: product.category,
-      }];
-    });
+    setCart((current) => addCartItem(current, product, variant));
     setMessage("");
     setSelected(null);
+  }
+
+  function continueToCheckout(product: Product, variant: Variant) {
+    setCart((current) => addCartItem(current, product, variant));
+    setMessage("");
+    setSelected(null);
+    setView("checkout");
   }
 
   function updateCartQuantity(variantId: number, quantity: number) {
@@ -339,17 +346,18 @@ export default function StorefrontClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8F0F1] text-[#22304A]">
+    <main className="min-h-screen overflow-x-hidden bg-[#F8F0F1] text-[#22304A]">
       <StoreHeader chatLink={chatLink} cartCountValue={totalItems} onCartClick={() => setView("cart")} />
 
-      <section id="top" className="mx-auto grid max-w-7xl gap-6 px-5 pb-9 pt-9 lg:grid-cols-[1.35fr_.65fr] lg:px-8 lg:pb-12 lg:pt-12">
-        <div className="flex flex-col justify-center rounded-[30px] border border-[#EBCBD2] bg-white p-7 shadow-[0_18px_60px_rgba(87,38,57,.07)] sm:p-10">
+      <section id="top" className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 pt-6 sm:px-5 sm:pt-9 lg:grid-cols-[1.35fr_.65fr] lg:px-8 lg:pb-12 lg:pt-12">
+        <div className="flex min-w-0 flex-col justify-center rounded-[26px] border border-[#EBCBD2] bg-white p-5 shadow-[0_18px_60px_rgba(87,38,57,.07)] sm:rounded-[30px] sm:p-10">
           <span className="mb-5 w-fit rounded-full bg-[#F2D8DE] px-4 py-2 text-sm font-black text-[#713548]">✓ Trusted 100%</span>
-          <h1 className="max-w-3xl text-4xl font-black leading-[1.08] tracking-[-.04em] text-[#2A1620] sm:text-5xl">Lakukan pembayaran melalui web jika perlu Struk/Invoice</h1>
+          <h1 className="max-w-3xl break-words text-[2rem] font-black leading-[1.1] tracking-[-.035em] text-[#2A1620] sm:text-5xl">Lakukan pembayaran melalui web jika perlu Struk/Invoice</h1>
           <p className="mt-4 text-base font-semibold text-[#8e5b69] sm:text-lg">(Manual by WhatsApp jika tidak perlu struk)</p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button size="lg" className="h-12 rounded-xl bg-[#2A1620] px-6 text-white hover:bg-[#4a2838]" asChild><a href="#produk">Lihat Katalog <ArrowRight /></a></Button>
-            <Button size="lg" variant="outline" className="h-12 rounded-xl border-[#EBCBD2] bg-white px-6 text-[#2A1620] hover:bg-[#F8F0F1]" asChild><a href="#cara">Cara Pembelian</a></Button>
+          <div className="mt-7 grid gap-3 sm:flex sm:flex-wrap">
+            <Button size="lg" className="h-12 w-full rounded-xl bg-[#2A1620] px-5 text-white hover:bg-[#4a2838] sm:w-auto" asChild><a href="#produk">Lihat Katalog <ArrowRight /></a></Button>
+            <Button size="lg" variant="outline" className="h-12 w-full rounded-xl border-[#EBCBD2] bg-white px-5 text-[#2A1620] hover:bg-[#F8F0F1] sm:w-auto" asChild><a href="#cara">Cara Pembelian</a></Button>
+            <Button size="lg" variant="outline" className="h-12 w-full rounded-xl border-[#EBCBD2] bg-[#FDF8F9] px-5 text-[#2A1620] hover:bg-[#F2D8DE] sm:w-auto" asChild><a href="/other-shop"><ShoppingBag /> Other Shop</a></Button>
           </div>
         </div>
         <aside className="rounded-[30px] bg-[#E9B8C2] p-6 text-[#2A1620]">
@@ -362,7 +370,7 @@ export default function StorefrontClient() {
         </aside>
       </section>
 
-      <section id="produk" className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+      <section id="produk" className="mx-auto max-w-7xl px-4 py-10 sm:px-5 lg:px-8">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div><p className="text-sm font-black uppercase tracking-[.18em] text-[#b05e73]">Katalog</p><h2 className="mt-2 text-3xl font-black text-[#2A1620]">Pilih aplikasi</h2></div>
           <label className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#EBCBD2] bg-white px-4 md:w-80"><Search className="size-5 text-[#b57b88]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari produk..." className="w-full bg-transparent text-base outline-none" /></label>
@@ -376,9 +384,9 @@ export default function StorefrontClient() {
                 <ProductIcon product={product} />
                 <p className="mt-5 text-xs font-black uppercase tracking-[.15em] text-[#b17684]">{product.category}</p>
                 <h3 className="mt-1 text-xl font-black text-[#2A1620]">{product.name}</h3>
-                <div className="mt-5 flex items-end justify-between border-t border-[#f1e2e5] pt-4">
+                <div className="mt-5 flex flex-col gap-3 border-t border-[#f1e2e5] pt-4 min-[360px]:flex-row min-[360px]:items-end min-[360px]:justify-between">
                   <div><p className="text-xs text-[#8b8f99]">Mulai dari</p><p className="text-lg font-black text-[#2A1620]">{rupiah(Math.min(...product.variants.map((variant) => variant.price)))}</p></div>
-                  <Button onClick={() => openProduct(product)} className="rounded-xl bg-[#E9B8C2] text-[#2A1620] hover:bg-[#dda4b1]">Pilih Paket</Button>
+                  <Button onClick={() => openProduct(product)} className="w-full rounded-xl bg-[#E9B8C2] text-[#2A1620] hover:bg-[#dda4b1] min-[360px]:w-auto">Pilih Paket</Button>
                 </div>
               </article>
             ))}
@@ -392,7 +400,7 @@ export default function StorefrontClient() {
       </section>
 
       <section id="cara" className="border-y border-[#EBCBD2] bg-white py-12">
-        <div className="mx-auto max-w-7xl px-5 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
           <h2 className="text-3xl font-black text-[#2A1620]">Cara Pembelian</h2>
           <div className="mt-7 grid gap-4 md:grid-cols-4">
             {[[LayoutGrid, "Pilih paket", "Pilih aplikasi dan paket yang dibutuhkan."], [ShoppingCart, "Keranjang", "Tambahkan beberapa produk sekaligus ke keranjang."], [Play, "Bayar", "Checkout sekali untuk seluruh isi keranjang."], [BadgeCheck, "Unduh invoice", "Setelah lunas, invoice berisi semua item."]].map(([Icon, title, copy], index) => {
@@ -410,14 +418,17 @@ export default function StorefrontClient() {
       </section>
 
       <footer id="bantuan" className="bg-[#2A1620] text-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-9 md:flex-row md:items-center md:justify-between lg:px-8">
-          <div><strong className="text-lg">Miztel Digital</strong><p className="mt-1 text-sm text-[#d8bdc5]">Produk digital dengan bukti pembelian yang jelas.</p></div>
-          <Button asChild className="rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE]"><a href={chatLink} target="_blank" rel="noreferrer"><Headphones /> Chat Penjual</a></Button>
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-9 sm:px-5 md:flex-row md:items-center md:justify-between lg:px-8">
+          <div><strong className="text-lg">Miztel Digital</strong><p className="mt-1 text-sm text-[#d8bdc5]">Gabung ke Channel WhatsApp untuk promo &amp; update terbaru.</p></div>
+          <div className="grid gap-3 sm:flex sm:flex-wrap">
+            <Button asChild variant="outline" className="rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"><a href="linkabcd" target="_blank" rel="noreferrer"><MessageCircle /> Gabung Channel WhatsApp</a></Button>
+            <Button asChild className="rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE]"><a href={chatLink} target="_blank" rel="noreferrer"><Headphones /> Chat Penjual</a></Button>
+          </div>
         </div>
       </footer>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-xl overflow-hidden rounded-[26px] border-[#EBCBD2] bg-white p-0">
+        <DialogContent className="max-h-[92vh] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[22px] border-[#EBCBD2] bg-white p-0 sm:max-w-xl sm:rounded-[26px]">
           {selected && chosenVariant && (
             <>
               <div className="bg-[#F2D8DE] p-6 pr-12">
@@ -439,8 +450,8 @@ export default function StorefrontClient() {
                   ))}
                 </RadioGroup>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <Button onClick={() => addToCart(selected, chosenVariant)} className="h-12 rounded-xl bg-[#2A1620] text-white hover:bg-[#4a2838]"><ShoppingCart /> Tambah ke Keranjang</Button>
-                  <Button variant="outline" onClick={() => setView("cart")} className="h-12 rounded-xl border-[#EBCBD2]">Lihat Keranjang ({totalItems})</Button>
+                  <Button onClick={() => addToCart(selected, chosenVariant)} className="h-auto min-h-12 whitespace-normal rounded-xl bg-[#2A1620] px-4 py-3 text-white hover:bg-[#4a2838]"><ShoppingCart /> Tambahkan ke Keranjang</Button>
+                  <Button variant="outline" onClick={() => continueToCheckout(selected, chosenVariant)} className="h-auto min-h-12 whitespace-normal rounded-xl border-[#EBCBD2] px-4 py-3"><ArrowRight /> Lanjut Pembayaran</Button>
                 </div>
               </div>
             </>
@@ -597,7 +608,7 @@ function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmi
             </div>
           )}
           {message && <p className="mt-5 rounded-xl bg-[#fee2e2] p-3 text-sm font-semibold text-[#b91c1c]">{message}</p>}
-          <Button disabled={submitting} type="submit" className="mt-7 h-12 rounded-xl bg-[#2A1620] px-7 text-white">{submitting ? "Membuat order..." : "Lanjut Pembayaran"} <ArrowRight /></Button>
+          <Button disabled={submitting} type="submit" className="mt-7 h-auto min-h-12 w-full whitespace-normal rounded-xl bg-[#2A1620] px-5 py-3 text-white sm:w-auto">{submitting ? "Membuat order..." : "Lanjut Pembayaran"} <ArrowRight /></Button>
         </form>
         <aside className="h-fit rounded-[24px] border border-[#EBCBD2] bg-white p-6">
           <h2 className="font-black text-[#2A1620]">Ringkasan pesanan</h2>

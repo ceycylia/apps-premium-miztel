@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, BadgeCheck, FileText, ImagePlus, KeyRound, LockKeyhole, LogOut, MessageCircle, Package, Pencil, Plus, Printer, ReceiptText, RefreshCw, Save, Settings, ShoppingBag, Trash2, User, WalletCards, X } from "lucide-react";
+import { BarChart3, BadgeCheck, FileText, ImagePlus, Images, KeyRound, LockKeyhole, LogOut, MessageCircle, Package, Pencil, Plus, Printer, ReceiptText, RefreshCw, Save, Settings, ShoppingBag, Trash2, User, WalletCards, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { OtherShopDialog, OtherShopPanel } from "./other-shop-admin";
 
 type Admin = { id: number; name: string; email: string };
 type Variant = { id?: number; variantName: string; price: number };
 type Product = { id: number; name: string; category: string; description: string; imageUrl: string | null; isActive: boolean; variants: Variant[] };
+type OtherShopItem = { id: number; title: string; imageUrl: string; isActive: boolean };
 type OrderItem = { productNameSnapshot: string; variantNameSnapshot: string; quantity: number; subtotal: number };
 type Order = { id: number; orderNumber: string; invoiceNumber: string; buyerName: string; buyerWhatsapp: string; companyName?: string | null; total: number; paymentStatus: string; orderStatus: string; createdAt: string; items: OrderItem[] };
 type StoreSettings = { whatsappNumber: string; storePhone: string; storeEmail: string; storeAddress: string; invoiceNote: string };
-type Tab = "dashboard" | "orders" | "products" | "invoices" | "settings" | "profile";
+type Tab = "dashboard" | "orders" | "products" | "otherShop" | "invoices" | "settings" | "profile";
 
 const rupiah = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 const inputClass = "h-11 w-full rounded-xl border border-[#EBCBD2] bg-white px-4 outline-none focus:border-[#bd7184] focus:ring-4 focus:ring-[#F2D8DE]";
@@ -82,17 +84,20 @@ function Field({ label, value, setValue, type = "text" }: { label: string; value
 function AdminDashboard({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [products, setProducts] = useState<Product[]>([]);
+  const [otherShopItems, setOtherShopItems] = useState<OtherShopItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<StoreSettings>({ whatsappNumber: "", storePhone: "", storeEmail: "", storeAddress: "", invoiceNote: "Dokumen ini merupakan bukti pembelian yang sah" });
   const [productDialog, setProductDialog] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [otherShopDialog, setOtherShopDialog] = useState(false);
+  const [editingOtherShop, setEditingOtherShop] = useState<OtherShopItem | null>(null);
   const [invoice, setInvoice] = useState<Order | null>(null);
   const [profileReset, setProfileReset] = useState(false);
   const [notice, setNotice] = useState("");
 
   async function loadAll() {
-    const [productData, orderData, settingData] = await Promise.all([requestJson("/api/admin/products"), requestJson("/api/admin/orders"), requestJson("/api/admin/settings")]);
-    setProducts(productData.products); setOrders(orderData.orders); setSettings(settingData.settings);
+    const [productData, otherShopData, orderData, settingData] = await Promise.all([requestJson("/api/admin/products"), requestJson("/api/admin/other-shop"), requestJson("/api/admin/orders"), requestJson("/api/admin/settings")]);
+    setProducts(productData.products); setOtherShopItems(otherShopData.items); setOrders(orderData.orders); setSettings(settingData.settings);
   }
   useEffect(() => { void loadAll().catch((error) => setNotice(error.message)); }, []);
   const revenue = orders.filter((order) => order.paymentStatus === "paid").reduce((total, order) => total + order.total, 0);
@@ -104,17 +109,19 @@ function AdminDashboard({ admin, onLogout }: { admin: Admin; onLogout: () => voi
     [ReceiptText, "Selesai", orders.filter((order) => order.orderStatus === "selesai").length],
     [BarChart3, "Pendapatan", rupiah(revenue)],
   ];
-  const nav: [Tab, typeof BarChart3, string][] = [["dashboard", BarChart3, "Dashboard"], ["orders", ShoppingBag, "Pesanan"], ["products", Package, "Produk"], ["invoices", ReceiptText, "Invoice"], ["settings", Settings, "Pengaturan"], ["profile", User, "Profil Admin"]];
+  const nav: [Tab, typeof BarChart3, string][] = [["dashboard", BarChart3, "Dashboard"], ["orders", ShoppingBag, "Pesanan"], ["products", Package, "Produk"], ["otherShop", Images, "Other Shop"], ["invoices", ReceiptText, "Invoice"], ["settings", Settings, "Pengaturan"], ["profile", User, "Profil Admin"]];
 
   return <main className="min-h-screen bg-[#f9f4f5] text-[#22304A]"><div className="grid min-h-screen lg:grid-cols-[245px_1fr]"><aside className="bg-[#2A1620] p-4 text-white lg:p-5"><div className="flex items-center gap-3 px-2 py-3"><span className="grid size-10 place-items-center rounded-2xl bg-[#E9B8C2] font-black text-[#2A1620]">M</span><div><strong className="block">Miztel Digital</strong><span className="text-xs text-[#cbb7bd]">Admin workspace</span></div></div><nav className="mt-5 grid grid-cols-2 gap-2 text-sm font-bold sm:grid-cols-3 lg:mt-8 lg:grid-cols-1">{nav.map(([value, Icon, label]) => <button key={value} onClick={() => setTab(value)} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left ${tab === value ? "bg-white/10 text-white" : "text-[#cebcc1] hover:bg-white/5"}`}><Icon className="size-4" />{label}</button>)}</nav><div className="mt-5 rounded-2xl bg-white/5 p-4 lg:mt-10"><p className="text-xs text-[#bdaab0]">Login sebagai</p><p className="mt-1 text-sm font-bold">{admin.name}</p><button onClick={onLogout} className="mt-3 flex items-center gap-2 text-xs font-bold text-[#E9B8C2]"><LogOut className="size-3.5" /> Keluar</button></div></aside><div><header className="flex h-[72px] items-center justify-between border-b border-[#EBCBD2] bg-white px-5 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-wider text-[#a66a78]">Miztel Digital</p><h1 className="text-xl font-black text-[#2A1620]">{nav.find(([value]) => value === tab)?.[2]}</h1></div><a href="/" className="text-sm font-bold text-[#8d5060]">Lihat toko →</a></header><div className="p-5 lg:p-8">{notice && <p className="mb-5 rounded-xl bg-[#fff3d6] p-3 text-sm font-semibold text-[#8a5c00]">{notice}</p>}
     {tab === "dashboard" && <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{metrics.map(([Icon, label, value]) => { const I = Icon as typeof ShoppingBag; return <div key={String(label)} className="rounded-[20px] border border-[#EBCBD2] bg-white p-5"><span className="grid size-10 place-items-center rounded-xl bg-[#F2D8DE]"><I className="size-4 text-[#8d5060]" /></span><p className="mt-5 text-sm text-[#6B7280]">{String(label)}</p><p className="mt-1 text-2xl font-black text-[#2A1620]">{String(value)}</p></div>; })}</div><OrdersTable orders={orders.slice(0, 5)} onUpdated={loadAll} onInvoice={setInvoice} /></>}
     {tab === "orders" && <OrdersTable orders={orders} onUpdated={loadAll} onInvoice={setInvoice} />}
     {tab === "products" && <ProductsPanel products={products} onCreate={() => { setEditing(null); setProductDialog(true); }} onEdit={(product) => { setEditing(product); setProductDialog(true); }} onUpdated={loadAll} />}
+    {tab === "otherShop" && <OtherShopPanel items={otherShopItems} onCreate={() => { setEditingOtherShop(null); setOtherShopDialog(true); }} onEdit={(item) => { setEditingOtherShop(item); setOtherShopDialog(true); }} onUpdated={loadAll} />}
     {tab === "invoices" && <InvoicesPanel orders={orders.filter((order) => order.paymentStatus === "paid")} onInvoice={setInvoice} />}
     {tab === "settings" && <SettingsPanel settings={settings} setSettings={setSettings} onSaved={() => { setNotice("Pengaturan berhasil disimpan."); void loadAll(); }} />}
     {tab === "profile" && <ProfilePanel admin={admin} onReset={() => setProfileReset(true)} onChanged={onLogout} />}
   </div></div></div>
   <ProductDialog open={productDialog} product={editing} onOpenChange={setProductDialog} onSaved={async () => { setProductDialog(false); await loadAll(); }} />
+  <OtherShopDialog open={otherShopDialog} item={editingOtherShop} onOpenChange={setOtherShopDialog} onSaved={async () => { setOtherShopDialog(false); await loadAll(); }} />
   <InvoiceDialog order={invoice} onOpenChange={(open) => !open && setInvoice(null)} />
   <Dialog open={profileReset} onOpenChange={setProfileReset}><DialogContent className="max-w-lg rounded-[24px] border-[#EBCBD2] bg-[#F8F0F1] p-0"><ForgotPassword initialEmail={admin.email} onDone={onLogout} onCancel={() => setProfileReset(false)} /></DialogContent></Dialog>
   </main>;

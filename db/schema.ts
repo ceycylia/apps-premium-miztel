@@ -44,6 +44,14 @@ export const products = sqliteTable("products", {
   ...timestamps,
 }, (table) => [uniqueIndex("idx_products_slug").on(table.slug), index("idx_products_active_category").on(table.isActive, table.category)]);
 
+export const otherShopItems = sqliteTable("other_shop_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  imageUrl: text("image_url").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  ...timestamps,
+}, (table) => [index("idx_other_shop_items_active_created").on(table.isActive, table.createdAt)]);
+
 export const productVariants = sqliteTable("product_variants", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull().references(() => products.id),
