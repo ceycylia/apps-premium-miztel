@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type OtherShopItem = { id: number; title: string; imageUrl: string };
-type Settings = { storeName?: string; whatsappNumber?: string };
+type Settings = { storeName?: string; whatsappNumber?: string; whatsappChannelUrl?: string };
 
 function whatsappUrl(number: string, title: string) {
   const digits = number.replace(/\D/g, "").replace(/^0/, "62");
@@ -75,7 +75,7 @@ export default function OtherShopClient() {
       <footer className="bg-[#2A1620] text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:px-5 md:flex-row md:items-center md:justify-between lg:px-8">
           <div><strong>Miztel Digital</strong><p className="mt-1 text-sm text-[#d8bdc5]">Gabung ke Channel WhatsApp untuk promo &amp; update terbaru.</p></div>
-          <Button asChild className="w-full rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE] sm:w-auto"><a href="linkabcd" target="_blank" rel="noreferrer"><MessageCircle /> Gabung Channel WhatsApp</a></Button>
+          <Button asChild className="w-full rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE] sm:w-auto"><a href={settings.whatsappChannelUrl || "#"} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Channel WhatsApp</a></Button>
         </div>
       </footer>
 

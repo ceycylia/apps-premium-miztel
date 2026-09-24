@@ -116,6 +116,7 @@ export const storeSettings = sqliteTable("store_settings", {
   storeAddress: text("store_address"),
   storePhone: text("store_phone"),
   whatsappNumber: text("whatsapp_number").notNull().default(""),
+  whatsappChannelUrl: text("whatsapp_channel_url").notNull().default(""),
   storeEmail: text("store_email"),
   invoiceNote: text("invoice_note").notNull().default("Dokumen ini merupakan bukti pembelian yang sah"),
   ...timestamps,

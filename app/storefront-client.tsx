@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type Variant = { id: number; variantName: string; durationLabel: string; price: number };
 type Product = { id: number; name: string; category: string; description: string; imageUrl: string | null; variants: Variant[] };
-type Settings = { storeName: string; whatsappNumber: string; storePhone?: string; storeEmail?: string; invoiceNote?: string };
+type Settings = { storeName: string; whatsappNumber: string; whatsappChannelUrl?: string; storePhone?: string; storeEmail?: string; invoiceNote?: string };
 type OrderItem = { id?: number; productNameSnapshot: string; variantNameSnapshot: string; priceSnapshot: number; quantity: number; subtotal: number };
 type Order = { id: number; orderNumber: string; invoiceNumber: string; invoicePublicId: string; subtotal: number; paymentFee: number; total: number; paymentStatus: string; orderStatus: string; paidAt?: string | null; items?: OrderItem[] };
 type CartItem = { variantId: number; productId: number; productName: string; variantName: string; durationLabel: string; price: number; quantity: number; imageUrl: string | null; category: string };
@@ -421,8 +421,8 @@ export default function StorefrontClient() {
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-9 sm:px-5 md:flex-row md:items-center md:justify-between lg:px-8">
           <div><strong className="text-lg">Miztel Digital</strong><p className="mt-1 text-sm text-[#d8bdc5]">Gabung ke Channel WhatsApp untuk promo &amp; update terbaru.</p></div>
           <div className="grid gap-3 sm:flex sm:flex-wrap">
-            <Button asChild variant="outline" className="rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"><a href="linkabcd" target="_blank" rel="noreferrer"><MessageCircle /> Gabung Channel WhatsApp</a></Button>
-            <Button asChild className="rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE]"><a href={chatLink} target="_blank" rel="noreferrer"><Headphones /> Chat Penjual</a></Button>
+          <Button asChild variant="outline" className="rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"><a href={settings.whatsappChannelUrl || "#"} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Channel WhatsApp</a></Button>
+          <Button asChild className="rounded-xl bg-white text-[#2A1620] hover:bg-[#F2D8DE]"><a href={chatLink} target="_blank" rel="noreferrer"><Headphones /> Chat Penjual</a></Button>
           </div>
         </div>
       </footer>
@@ -450,8 +450,22 @@ export default function StorefrontClient() {
                   ))}
                 </RadioGroup>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <Button onClick={() => addToCart(selected, chosenVariant)} className="h-auto min-h-12 whitespace-normal rounded-xl bg-[#2A1620] px-4 py-3 text-white hover:bg-[#4a2838]"><ShoppingCart /> Tambahkan ke Keranjang</Button>
-                  <Button variant="outline" onClick={() => continueToCheckout(selected, chosenVariant)} className="h-auto min-h-12 whitespace-normal rounded-xl border-[#EBCBD2] px-4 py-3"><ArrowRight /> Lanjut Pembayaran</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => addToCart(selected, chosenVariant)}
+                    className="h-auto min-h-12 whitespace-normal rounded-xl border-[#EBCBD2] bg-[#FDF8F9] px-4 py-3 text-[#2A1620] hover:bg-[#F8F0F1]"
+                  >
+                    <ShoppingCart />
+                    Tambahkan ke Keranjang
+                  </Button>
+
+                  <Button
+                    onClick={() => continueToCheckout(selected, chosenVariant)}
+                    className="h-auto min-h-12 whitespace-normal rounded-xl bg-[#2A1620] px-4 py-3 text-white hover:bg-[#4a2838]"
+                  >
+                    <ArrowRight />
+                    Lanjut Pembayaran
+                  </Button>
                 </div>
               </div>
             </>
@@ -498,7 +512,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
   message: string;
 }) {
   return (
-    <main className="min-h-screen bg-[#F8F0F1]">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#F8F0F1]">
       <MiniHeader label="Keranjang" onBack={onBack} cartCountValue={cartCountValue} onCartClick={onCartClick} />
       <div className="mx-auto max-w-6xl px-5 py-8 lg:px-8">
         {message && <p className="mb-5 rounded-xl bg-[#fff3d6] p-4 text-sm font-semibold text-[#8a5c00]">{message}</p>}
@@ -656,10 +670,10 @@ function Payment({ items, order, paymentUrl, onBack, onCheck, onSimulate, messag
   return (
     <main className="min-h-screen bg-[#F8F0F1]">
       <MiniHeader label="Pembayaran" onBack={onBack} />
-      <div className="mx-auto max-w-2xl px-5 py-10">
+      <div className="mx-auto w-full max-w-2xl px-3 py-5 min-[390px]:px-4 sm:px-5 sm:py-10">
         <div className="rounded-[28px] border border-[#EBCBD2] bg-white p-7 text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-[#fff3d6] px-4 py-2 text-sm font-black text-[#a66600]"><Clock3 className="size-4" /> Menunggu pembayaran</span>
-          <h1 className="mt-5 text-3xl font-black text-[#2A1620]">Selesaikan pembayaran</h1>
+          <h1 className="mt-5 text-2xl font-black text-[#2A1620] sm:text-3xl">Selesaikan pembayaran</h1>
           <div className="mx-auto mt-6 grid size-44 place-items-center rounded-[22px] border-2 border-[#2A1620] bg-[#F8F0F1] shadow-[7px_7px_0_#E9B8C2]"><QrCode className="size-28 text-[#2A1620]" /></div>
           <div className="mx-auto mt-6 max-w-md rounded-2xl bg-[#FDF8F9] p-5 text-left">
             <p className="flex justify-between text-sm"><span>Order</span><strong>{order.orderNumber}</strong></p>
@@ -714,13 +728,13 @@ function PaymentSuccess({ items, order, settings, onBack }: { items: OrderItem[]
     <main className="min-h-screen bg-[#F8F0F1]">
       <MiniHeader label="Pembayaran Berhasil" onBack={onBack} />
       <div className="mx-auto max-w-2xl px-5 py-10">
-        <div className="rounded-[28px] border border-[#EBCBD2] bg-white p-7 sm:p-9">
+      <div className="min-w-0 rounded-[28px] border border-[#EBCBD2] bg-white p-4 min-[390px]:p-6 sm:p-9">
           <div className="text-center">
             <span className="mx-auto grid size-16 place-items-center rounded-full bg-[#dcfce7] text-[#16A34A]"><Check className="size-9 stroke-[3]" /></span>
-            <h1 className="mt-5 text-3xl font-black text-[#2A1620]">Pembayaran Berhasil</h1>
+            <h1 className="mt-5 text-2xl font-black text-[#2A1620] sm:text-3xl">Pembayaran Berhasil</h1>
             <p className="mt-2 text-sm text-[#6B7280]">Pembayaran telah diterima dan invoice sudah tersedia.</p>
           </div>
-          <div className="mt-7 space-y-3 rounded-2xl bg-[#FDF8F9] p-5 text-sm">
+          <div className="mt-6 min-w-0 space-y-3 rounded-2xl bg-[#FDF8F9] p-4 text-sm min-[390px]:p-5">
             <p className="flex justify-between gap-4"><span>Nomor order</span><strong className="text-right">{order.orderNumber}</strong></p>
             <p className="flex justify-between gap-4"><span>Nomor invoice</span><strong className="text-right">{order.invoiceNumber}</strong></p>
             <div className="border-t border-[#EBCBD2] pt-3">
@@ -738,7 +752,7 @@ function PaymentSuccess({ items, order, settings, onBack }: { items: OrderItem[]
             <p className="flex justify-between gap-4"><span>Status</span><span className="rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-black text-[#15803d]">LUNAS</span></p>
           </div>
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            <Button asChild className="h-14 rounded-xl bg-[#16A34A] text-base font-black text-white hover:bg-[#15803d] sm:col-span-2"><a href={processLink} target="_blank" rel="noreferrer"><MessageCircle /> Kirim Bukti &amp; Proses via WhatsApp</a></Button>
+          <Button asChild className="h-auto min-h-14 w-full whitespace-normal rounded-xl bg-[#16A34A] px-3 py-3 text-center text-sm font-black leading-5 text-white hover:bg-[#15803d] sm:col-span-2 sm:px-4 sm:text-base"><a href={processLink} target="_blank" rel="noreferrer"><MessageCircle />Kirim Bukti &amp; Proses via WhatsApp</a></Button>
             <Button asChild className="h-12 rounded-xl bg-[#2A1620] text-white"><a href={invoicePath} target="_blank" rel="noreferrer"><BadgeCheck /> Lihat Invoice</a></Button>
             <Button asChild variant="outline" className="h-12 rounded-xl border-[#EBCBD2]"><a href={`${invoicePath}?download=1`} target="_blank" rel="noreferrer"><Download /> Download Invoice PDF</a></Button>
             <Button asChild variant="outline" className="h-11 rounded-xl border-[#EBCBD2] sm:col-span-2"><a href={`${invoicePath}?print=1`} target="_blank" rel="noreferrer"><Printer /> Print Invoice</a></Button>
