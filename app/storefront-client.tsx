@@ -364,8 +364,8 @@ export default function StorefrontClient() {
           <div className="flex items-center justify-between"><span className="rounded-full bg-white/75 px-3 py-1 text-xs font-bold uppercase tracking-widest">Invoice preview</span><BadgeCheck className="size-5" /></div>
           <div className="mx-auto mt-5 max-w-xs rounded-[18px] bg-white p-4 shadow-[7px_7px_0_rgba(42,22,32,.1)]">
             <div className="flex justify-between border-b border-dashed border-[#EBCBD2] pb-3"><div><p className="text-[11px] font-black tracking-wider text-[#a46775]">INVOICE</p><p className="text-sm font-black">INV-20260922-0001</p></div><span className="h-fit rounded-full bg-[#dcfce7] px-2 py-1 text-[10px] font-black text-[#15803d]">LUNAS</span></div>
-            <div className="space-y-2 py-4 text-sm"><p className="flex justify-between"><span>Canva - 1 Bulan</span><strong>Rp15.000</strong></p><p className="flex justify-between"><span>Spotify - 1 Bulan</span><strong>Rp28.000</strong></p></div>
-            <div className="flex justify-between border-t border-[#f1e2e5] pt-3 text-sm"><span>Total</span><strong>Rp43.500</strong></div>
+            <div className="space-y-2 py-4 text-sm"><p className="flex justify-between"><span>Canva - 1 Bulan</span><strong>Rp1.000</strong></p><p className="flex justify-between"><span>Spotify - 1 Bulan</span><strong>Rp10.000</strong></p></div>
+            <div className="flex justify-between border-t border-[#f1e2e5] pt-3 text-sm"><span>Total</span><strong>Rp11.000</strong></div>
           </div>
         </aside>
       </section>
