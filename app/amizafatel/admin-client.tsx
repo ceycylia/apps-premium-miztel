@@ -113,7 +113,11 @@ function AdminDashboard({ admin, onLogout }: { admin: Admin; onLogout: () => voi
   useEffect(() => { const timer = window.setTimeout(() => { void loadAll().catch((error) => setNotice(error.message)); }, 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => { const timer = window.setInterval(() => { void loadOrders().catch(() => undefined); }, 5_000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(""), 5_000); return () => window.clearTimeout(timer); }, [notice]);
-  const revenue = orders.filter((order) => order.paymentStatus === "paid").reduce((total, order) => total + order.subtotal - (order.costAmount ?? 0), 0);
+  const revenue = orders.filter((order) => order.paymentStatus === "paid").reduce((total, order) => {
+    const saleAmount = Number(order.subtotal);
+    const costAmount = Number(order.costAmount ?? 0);
+    return total + (Number.isFinite(saleAmount) ? saleAmount : 0) - (Number.isFinite(costAmount) ? costAmount : 0);
+  }, 0);
   const today = new Date().toISOString().slice(0, 10);
   const metrics = [
     [ShoppingBag, "Order hari ini", orders.filter((order) => order.createdAt.startsWith(today)).length],
