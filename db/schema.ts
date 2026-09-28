@@ -75,6 +75,7 @@ export const orders = sqliteTable("orders", {
   invoiceName: text("invoice_name"),
   companyName: text("company_name"),
   subtotal: integer("subtotal").notNull(),
+  costAmount: integer("cost_amount").notNull().default(0),
   paymentFee: integer("payment_fee").notNull().default(0),
   total: integer("total").notNull(),
   paymentMethod: text("payment_method").notNull().default("manual"),

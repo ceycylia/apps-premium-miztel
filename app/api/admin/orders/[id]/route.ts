@@ -9,13 +9,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const admin = await getAuthenticatedAdmin(request);
     if (!admin) return Response.json({ error: "Sesi admin berakhir" }, { status: 401 });
     const id = Number((await context.params).id);
-    const body = await request.json() as { confirmPayment?: boolean };
-    if (!Number.isInteger(id) || body.confirmPayment !== true) return Response.json({ error: "Aksi tidak valid" }, { status: 400 });
+    const body = await request.json() as { confirmPayment?: boolean; costAmount?: number };
+    const hasCostAmount = body.costAmount !== undefined;
+    if (!Number.isInteger(id) || (body.confirmPayment !== true && !hasCostAmount)) return Response.json({ error: "Aksi tidak valid" }, { status: 400 });
+    if (hasCostAmount && (!Number.isInteger(body.costAmount) || body.costAmount! < 0)) return Response.json({ error: "Modal harus berupa angka nol atau lebih" }, { status: 400 });
     const db = getDb();
     const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
     if (!order) return Response.json({ error: "Order tidak ditemukan" }, { status: 404 });
     const now = new Date().toISOString();
-    if (order.paymentStatus === "paid") return Response.json({ success: true });
+    if (hasCostAmount) {
+      await db.update(orders).set({ costAmount: body.costAmount!, updatedAt: now }).where(eq(orders.id, id));
+    }
+    if (body.confirmPayment !== true || order.paymentStatus === "paid") return Response.json({ success: true });
     const paidAt = order.paidAt || now;
     await db.update(orders).set({
       invoicePublicId: order.invoicePublicId || createInvoicePublicId(),

@@ -16,7 +16,7 @@ type Variant = { id?: number; variantName: string; price: number };
 type Product = { id: number; name: string; category: string; description: string; imageUrl: string | null; isActive: boolean; variants: Variant[] };
 type OtherShopItem = { id: number; title: string; imageUrl: string; isActive: boolean };
 type OrderItem = { productNameSnapshot: string; variantNameSnapshot: string; quantity: number; subtotal: number };
-type Order = { id: number; orderNumber: string; invoiceNumber: string; buyerName: string; buyerWhatsapp: string; companyName?: string | null; subtotal: number; paymentFee: number; total: number; paymentMethod: string; paymentStatus: string; orderStatus: string; paidAt?: string | null; createdAt: string; items: OrderItem[] };
+type Order = { id: number; orderNumber: string; invoiceNumber: string; buyerName: string; buyerWhatsapp: string; companyName?: string | null; subtotal: number; costAmount: number; paymentFee: number; total: number; paymentMethod: string; paymentStatus: string; orderStatus: string; paidAt?: string | null; createdAt: string; items: OrderItem[] };
 type StoreSettings = { whatsappNumber: string; whatsappChannelUrl: string; storePhone: string; storeEmail: string; storeAddress: string; qrisImageUrl?: string | null; qrisAccountName?: string | null; paymentInstruction: string; invoiceNote: string };
 type Tab = "dashboard" | "orders" | "products" | "otherShop" | "invoices" | "settings" | "profile";
 
@@ -106,8 +106,14 @@ function AdminDashboard({ admin, onLogout }: { admin: Admin; onLogout: () => voi
     const [productData, otherShopData, orderData, settingData] = await Promise.all([requestJson<{ products: Product[] }>("/api/admin/products"), requestJson<{ items: OtherShopItem[] }>("/api/admin/other-shop"), requestJson<{ orders: Order[] }>("/api/admin/orders"), requestJson<{ settings: StoreSettings }>("/api/admin/settings")]);
     setProducts(productData.products); setOtherShopItems(otherShopData.items); setOrders(orderData.orders); setSettings(settingData.settings);
   }
+  async function loadOrders() {
+    const orderData = await requestJson<{ orders: Order[] }>("/api/admin/orders");
+    setOrders(orderData.orders);
+  }
   useEffect(() => { const timer = window.setTimeout(() => { void loadAll().catch((error) => setNotice(error.message)); }, 0); return () => window.clearTimeout(timer); }, []);
-  const revenue = orders.filter((order) => order.paymentStatus === "paid").reduce((total, order) => total + order.total, 0);
+  useEffect(() => { const timer = window.setInterval(() => { void loadOrders().catch(() => undefined); }, 5_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(""), 5_000); return () => window.clearTimeout(timer); }, [notice]);
+  const revenue = orders.filter((order) => order.paymentStatus === "paid").reduce((total, order) => total + order.subtotal - (order.costAmount ?? 0), 0);
   const today = new Date().toISOString().slice(0, 10);
   const metrics = [
     [ShoppingBag, "Order hari ini", orders.filter((order) => order.createdAt.startsWith(today)).length],
@@ -154,6 +160,7 @@ function OrdersTable({ orders, onUpdated, onInvoice }: { orders: Order[]; onUpda
   const [deleting, setDeleting] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [costDrafts, setCostDrafts] = useState<Record<number, string>>({});
 
   async function update(order: Order, payload: object) {
     setBusy(true);
@@ -175,6 +182,17 @@ function OrdersTable({ orders, onUpdated, onInvoice }: { orders: Order[]; onUpda
     if (await update(confirming, { confirmPayment: true })) setConfirming(null);
   }
 
+  async function saveCost(order: Order) {
+    const value = Number(costDrafts[order.id] ?? order.costAmount ?? 0);
+    if (!Number.isInteger(value) || value < 0) {
+      setError("Modal harus berupa angka nol atau lebih.");
+      return;
+    }
+    if (await update(order, { costAmount: value })) {
+      setCostDrafts((current) => { const next = { ...current }; delete next[order.id]; return next; });
+    }
+  }
+
   async function deleteOrder() {
     if (!deleting) return;
     setBusy(true);
@@ -193,14 +211,14 @@ function OrdersTable({ orders, onUpdated, onInvoice }: { orders: Order[]; onUpda
   return <>
     <div className="mt-6 overflow-hidden rounded-[22px] border border-[#EBCBD2] bg-white">
       <div className="border-b border-[#EBCBD2] p-4 sm:p-5"><h2 className="font-black text-[#2A1620]">Pesanan</h2><p className="text-sm text-[#6B7280]">Konfirmasi pembayaran, buka invoice, atau hapus data pesanan testing.</p>{error && <p className="mt-3 break-words rounded-xl bg-[#fee2e2] p-3 text-sm font-semibold text-[#b91c1c]">{error}</p>}</div>
-      {orders.length ? <div className="max-w-full touch-pan-x overflow-x-auto overscroll-x-contain"><Table className="min-w-[1100px]"><TableHeader><TableRow className="bg-[#FDF8F9]"><TableHead className="px-5">Order</TableHead><TableHead>Pembeli</TableHead><TableHead>Produk</TableHead><TableHead>Total</TableHead><TableHead>Tanggal</TableHead><TableHead>Pembayaran</TableHead><TableHead>Status</TableHead><TableHead className="px-5 text-right">Aksi</TableHead></TableRow></TableHeader><TableBody>{orders.map((order) => <TableRow key={order.id}>
+      {orders.length ? <div className="max-w-full touch-pan-x overflow-x-auto overscroll-x-contain"><Table className="min-w-[1180px]"><TableHeader><TableRow className="bg-[#FDF8F9]"><TableHead className="px-5">Order</TableHead><TableHead>Pembeli</TableHead><TableHead>Produk</TableHead><TableHead>Total</TableHead><TableHead>Modal</TableHead><TableHead>Tanggal</TableHead><TableHead>Pembayaran</TableHead><TableHead className="px-5 text-right">Aksi</TableHead></TableRow></TableHeader><TableBody>{orders.map((order) => <TableRow key={order.id}>
         <TableCell className="px-5 font-bold">{order.orderNumber}</TableCell>
         <TableCell><strong>{order.buyerName}</strong><span className="block text-xs text-[#6B7280]">{order.buyerWhatsapp}</span></TableCell>
         <TableCell className="min-w-52"><span className="line-clamp-2 text-sm">{order.items.map((item) => `${item.productNameSnapshot} - ${item.variantNameSnapshot} × ${item.quantity}`).join(", ") || "-"}</span></TableCell>
         <TableCell className="font-bold">{rupiah(order.subtotal)}</TableCell>
+        <TableCell><div className="flex min-w-[180px] items-center gap-2"><input type="number" min="0" step="1" inputMode="numeric" aria-label={`Modal order ${order.orderNumber}`} value={costDrafts[order.id] ?? String(order.costAmount ?? 0)} onChange={(event) => setCostDrafts((current) => ({ ...current, [order.id]: event.target.value }))} className="h-9 w-28 rounded-lg border border-[#EBCBD2] bg-white px-3 text-sm outline-none focus:border-[#bd7184] focus:ring-2 focus:ring-[#F2D8DE]" /><Button disabled={busy} size="icon-sm" variant="outline" onClick={() => void saveCost(order)} className="border-[#EBCBD2]" aria-label={`Simpan modal order ${order.orderNumber}`}><Save /></Button></div></TableCell>
         <TableCell className="whitespace-nowrap text-sm">{new Date(order.createdAt).toLocaleString("id-ID")}</TableCell>
         <TableCell><StatusPill value={order.paymentStatus === "paid" ? "lunas" : order.orderStatus} /></TableCell>
-        <TableCell><StatusPill value={order.orderStatus} /></TableCell>
         <TableCell className="px-5 text-right"><div className="flex min-w-max justify-end gap-2">
           {order.paymentStatus !== "paid" && <Button disabled={busy} size="sm" onClick={() => { setError(""); setConfirming(order); }} className="bg-[#16A34A]">Konfirmasi Pembayaran</Button>}
           {order.paymentStatus === "paid" && <Button size="sm" variant="outline" onClick={() => onInvoice(order)} className="border-[#EBCBD2]">Invoice</Button>}
