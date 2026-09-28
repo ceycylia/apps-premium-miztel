@@ -1,9 +1,12 @@
 "use client";
+/* eslint-disable @next/next/no-html-link-for-pages -- Native home links work reliably in the current vinext runtime. */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, ImageIcon, MessageCircle, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { parseJson } from "@/lib/client-json";
 
 type OtherShopItem = { id: number; title: string; imageUrl: string };
 type Settings = { storeName?: string; whatsappNumber?: string; whatsappChannelUrl?: string };
@@ -23,8 +26,8 @@ export default function OtherShopClient() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/other-shop").then((response) => response.json()),
-      fetch("/api/settings").then((response) => response.json()),
+      fetch("/api/other-shop").then((response) => parseJson<{ items: OtherShopItem[] }>(response)),
+      fetch("/api/settings").then((response) => parseJson<{ settings: Settings }>(response)),
     ]).then(([catalog, store]) => {
       if (catalog.error) throw new Error(catalog.error);
       setItems(catalog.items ?? []);
@@ -38,7 +41,7 @@ export default function OtherShopClient() {
       <header className="border-b border-[#EBCBD2] bg-white">
         <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-5 lg:px-8">
           <Button asChild variant="ghost" className="-ml-3 shrink-0 rounded-xl text-[#2A1620]"><a href="/"><ArrowLeft /> <span className="hidden min-[360px]:inline">Kembali</span></a></Button>
-          <a href="/" className="min-w-0 text-center"><strong className="block truncate text-[#2A1620]">Miztel Digital</strong><span className="text-xs font-bold tracking-[.14em] text-[#a66a78]">OTHER SHOP</span></a>
+          <Link href="/" className="min-w-0 text-center"><strong className="block truncate text-[#2A1620]">Miztel Digital</strong><span className="text-xs font-bold tracking-[.14em] text-[#a66a78]">OTHER SHOP</span></Link>
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#F2D8DE]"><ShoppingBag className="size-5 text-[#8d5060]" /></span>
         </div>
       </header>

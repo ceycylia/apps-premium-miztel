@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { admins, adminSessions } from "@/db/schema";
 
 const SESSION_COOKIE = "miztel_admin_session";
-const ITERATIONS = 210_000;
+const ITERATIONS = 100_000;
 
 function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
@@ -73,6 +73,12 @@ export async function getAuthenticatedAdmin(request: Request) {
     .where(and(eq(adminSessions.tokenHash, await sha256(token)), gt(adminSessions.expiresAt, new Date().toISOString())))
     .limit(1);
   return row ?? null;
+}
+
+export async function verifyAdminPassword(adminId: number, password: string) {
+  if (!password) return false;
+  const [admin] = await getDb().select({ passwordHash: admins.passwordHash }).from(admins).where(eq(admins.id, adminId)).limit(1);
+  return Boolean(admin && await verifyPassword(password, admin.passwordHash));
 }
 
 export async function deleteAdminSession(request: Request) {

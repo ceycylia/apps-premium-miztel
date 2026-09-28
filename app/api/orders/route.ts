@@ -1,9 +1,7 @@
 import { desc, eq, inArray, like } from "drizzle-orm";
 import { getDb } from "@/db";
-import { orderItems, orders, products, productVariants } from "@/db/schema";
-import { createInvoicePublicId } from "@/lib/invoice";
-
-const PAYMENT_FEE = 1500;
+import { orderItems, orders, products, productVariants, storeSettings } from "@/db/schema";
+import { createInvoicePublicId, createOrderPublicToken } from "@/lib/invoice";
 
 async function documentNumbers() {
   const now = new Date();
@@ -54,6 +52,14 @@ export async function POST(request: Request) {
 
     const variantIds = [...merged.keys()];
     const db = getDb();
+    const [settings] = await db.select().from(storeSettings).limit(1);
+    if (!settings?.qrisImageUrl) {
+      return Response.json({ error: "Metode pembayaran QRIS belum tersedia. Silakan hubungi penjual." }, { status: 503 });
+    }
+    if (!settings.whatsappNumber) {
+      return Response.json({ error: "Nomor WhatsApp penjual belum dikonfigurasi." }, { status: 503 });
+    }
+
     const rows = await db
       .select({ variant: productVariants, product: products })
       .from(productVariants)
@@ -97,6 +103,7 @@ export async function POST(request: Request) {
     const numbers = await documentNumbers();
     const [order] = await db.insert(orders).values({
       ...numbers,
+      publicOrderToken: createOrderPublicToken(),
       invoicePublicId: createInvoicePublicId(),
       buyerName: body.buyerName.trim(),
       buyerWhatsapp: body.buyerWhatsapp.trim(),
@@ -105,15 +112,20 @@ export async function POST(request: Request) {
       invoiceName: body.invoiceName?.trim() || body.buyerName.trim(),
       companyName: body.companyName?.trim() || null,
       subtotal,
-      paymentFee: PAYMENT_FEE,
-      total: subtotal + PAYMENT_FEE,
-      paymentMethod: "qris_midtrans",
+      paymentFee: 0,
+      total: subtotal,
+      paymentMethod: "manual_qris",
+      paymentStatus: "pending",
+      orderStatus: "menunggu_pembayaran",
     }).returning();
 
     await db.insert(orderItems).values(lineItems.map((item) => ({ ...item, orderId: order.id })));
 
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-    return Response.json({ order: { ...order, items } }, { status: 201 });
+    return Response.json({
+      order: { ...order, items },
+      statusUrl: `/order/${order.publicOrderToken}`,
+    }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Gagal membuat order" }, { status: 500 });
   }

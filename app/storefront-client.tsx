@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Clock3, Download, Headphones, LayoutGrid, MessageCircle, Minus, Play, Plus, Printer, QrCode, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Headphones, LayoutGrid, MessageCircle, Minus, Play, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { parseJson } from "@/lib/client-json";
 
 type Variant = { id: number; variantName: string; durationLabel: string; price: number };
-type Product = { id: number; name: string; category: string; description: string; imageUrl: string | null; variants: Variant[] };
-type Settings = { storeName: string; whatsappNumber: string; whatsappChannelUrl?: string; storePhone?: string; storeEmail?: string; invoiceNote?: string };
-type OrderItem = { id?: number; productNameSnapshot: string; variantNameSnapshot: string; priceSnapshot: number; quantity: number; subtotal: number };
-type Order = { id: number; orderNumber: string; invoiceNumber: string; invoicePublicId: string; subtotal: number; paymentFee: number; total: number; paymentStatus: string; orderStatus: string; paidAt?: string | null; items?: OrderItem[] };
+type Product = { id: number; name: string; category: string; description: string; imageUrl: string | null; soldQuantity: number; variants: Variant[] };
+type Settings = { storeName: string; whatsappNumber: string; whatsappChannelUrl?: string; storePhone?: string; storeEmail?: string; qrisImageUrl?: string | null; invoiceNote?: string };
 type CartItem = { variantId: number; productId: number; productName: string; variantName: string; durationLabel: string; price: number; quantity: number; imageUrl: string | null; category: string };
-type View = "store" | "cart" | "checkout" | "payment" | "success";
+type View = "store" | "cart" | "checkout";
 
 const CART_STORAGE_KEY = "miztel-cart";
-const PAYMENT_FEE = 1500;
 const categories = ["Semua", "Music Apps", "Editing Apps", "Streaming Apps", "Other Apps"];
 
 const rupiah = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
@@ -70,15 +67,12 @@ function cartVariantLabel(item: Pick<CartItem, "variantName" | "durationLabel">)
   return [item.variantName, item.durationLabel].filter((value) => value.trim()).join(" · ");
 }
 
-function formatItemLine(item: Pick<CartItem, "productName" | "variantName" | "durationLabel"> | Pick<OrderItem, "productNameSnapshot" | "variantNameSnapshot">) {
-  if ("productNameSnapshot" in item) {
-    return `${item.productNameSnapshot} - ${item.variantNameSnapshot}`;
-  }
+function formatItemLine(item: Pick<CartItem, "productName" | "variantName" | "durationLabel">) {
   return `${item.productName} - ${cartVariantLabel(item)}`;
 }
 
 function ProductIcon({ product, size = "normal" }: { product: Pick<Product, "name" | "imageUrl">; size?: "normal" | "small" }) {
-  const dimensions = size === "small" ? "size-11 rounded-xl" : "size-14 rounded-[18px]";
+  const dimensions = size === "small" ? "size-11 shrink-0 rounded-xl" : "size-14 shrink-0 rounded-[18px]";
   if (product.imageUrl) return <img src={product.imageUrl} alt={`Icon ${product.name}`} className={`${dimensions} object-cover ring-1 ring-[#EBCBD2]`} />;
   return <span className={`grid ${dimensions} place-items-center bg-[#2A1620] text-lg font-black text-white`}>{product.name?.slice(0, 1).toUpperCase() || "?"}</span>;
 }
@@ -125,6 +119,7 @@ export default function StorefrontClient() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Semua");
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
   const [variantId, setVariantId] = useState(0);
   const [view, setView] = useState<View>("store");
@@ -136,14 +131,15 @@ export default function StorefrontClient() {
   const [needsInvoice, setNeedsInvoice] = useState(true);
   const [invoiceName, setInvoiceName] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [order, setOrder] = useState<Order | null>(null);
-  const [paymentUrl, setPaymentUrl] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setCart(loadCart());
-    setCartReady(true);
+    const timer = window.setTimeout(() => {
+      setCart(loadCart());
+      setCartReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -152,18 +148,23 @@ export default function StorefrontClient() {
   }, [cart, cartReady]);
 
   useEffect(() => {
-    Promise.all([fetch("/api/products").then((response) => response.json()), fetch("/api/settings").then((response) => response.json())])
-      .then(([catalog, store]) => { setProducts(catalog.products ?? []); setSettings(store.settings ?? settings); })
+    Promise.all([fetch("/api/products").then((response) => parseJson<{ products: Product[] }>(response)), fetch("/api/settings").then((response) => parseJson<{ settings: Settings }>(response))])
+      .then(([catalog, store]) => { setProducts(catalog.products ?? []); setSettings((current) => store.settings ?? current); })
       .catch(() => setMessage("Katalog sedang tidak tersedia. Silakan hubungi penjual."))
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => products.filter((product) => product.name.toLowerCase().includes(query.toLowerCase()) && (category === "Semua" || product.category === category)), [products, query, category]);
+  const filtered = useMemo(() => {
+    const matches = products.filter((product) => product.name.toLowerCase().includes(query.toLowerCase()) && (category === "Semua" || product.category === category));
+    return category === "Semua" ? matches : [...matches].sort((a, b) => a.name.localeCompare(b.name, "id"));
+  }, [products, query, category]);
+  const searchActive = query.trim().length > 0;
+  const displayedProducts = category === "Semua" && !searchActive && !showAllProducts ? filtered.slice(0, 9) : filtered;
   const chosenVariant = selected?.variants.find((variant) => variant.id === variantId) ?? selected?.variants[0];
   const chatLink = whatsappUrl(settings.whatsappNumber, "Halo Miztel Digital, saya ingin bertanya tentang produk digital.");
   const totalItems = cartCount(cart);
   const subtotal = cartSubtotal(cart);
-  const grandTotal = subtotal + (cart.length ? PAYMENT_FEE : 0);
+  const grandTotal = subtotal;
 
   const openProduct = (product: Product) => { setSelected(product); setVariantId(product.variants[0]?.id ?? 0); };
 
@@ -181,12 +182,20 @@ export default function StorefrontClient() {
   }
 
   function updateCartQuantity(variantId: number, quantity: number) {
-    if (quantity < 1 || quantity > 99) return;
-    setCart((current) => current.map((item) => item.variantId === variantId ? { ...item, quantity } : item));
+    setCart((current) => {
+      if (quantity <= 0) return current.filter((item) => item.variantId !== variantId);
+      if (quantity > 99) return current;
+      return current.map((item) => item.variantId === variantId ? { ...item, quantity } : item);
+    });
   }
 
   function removeFromCart(variantId: number) {
     setCart((current) => current.filter((item) => item.variantId !== variantId));
+  }
+
+  function returnToCatalog() {
+    setView("store");
+    window.setTimeout(() => document.getElementById("produk")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   async function createOrder() {
@@ -207,82 +216,18 @@ export default function StorefrontClient() {
           companyName,
         }),
       });
-      const data = await response.json();
+      const data = await parseJson<{ statusUrl: string }>(response);
       if (!response.ok) throw new Error(data.error ?? "Order gagal dibuat");
-      setOrder(data.order);
-
-      const midtransItems = [
-        ...data.order.items.map((item: OrderItem) => ({
-          id: String(item.id),
-          name: formatItemLine(item),
-          price: item.priceSnapshot,
-          quantity: item.quantity,
-        })),
-        { id: "fee", name: "Biaya pembayaran", price: data.order.paymentFee, quantity: 1 },
-      ];
-
-      const paymentResponse = await fetch("/api/midtrans/transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: data.order.orderNumber,
-          grossAmount: data.order.total,
-          items: midtransItems,
-          buyerName,
-          buyerEmail,
-          buyerWhatsapp,
-        }),
-      });
-      const payment = await paymentResponse.json();
-      if (paymentResponse.ok) setPaymentUrl(payment.redirect_url ?? "");
-      setView("payment");
+      if (!data.statusUrl) throw new Error("Link status order tidak tersedia");
+      saveCart([]);
+      setCart([]);
+      window.location.assign(data.statusUrl);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Order gagal dibuat");
     } finally {
       setSubmitting(false);
     }
   }
-
-  async function checkStatus() {
-    if (!order) return;
-    setSubmitting(true);
-    const response = await fetch("/api/orders/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderNumber: order.orderNumber, whatsapp: buyerWhatsapp }) });
-    const data = await response.json();
-    setSubmitting(false);
-    if (!response.ok) return setMessage(data.error ?? "Status gagal diperiksa");
-    setOrder(data.order);
-    if (data.order.paymentStatus === "paid") {
-      setCart([]);
-      setMessage("");
-      setView("success");
-    } else setMessage("Pembayaran belum terdeteksi");
-  }
-
-  async function simulatePayment() {
-    if (!order) return;
-    setSubmitting(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/orders/simulate-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderNumber: order.orderNumber, whatsapp: buyerWhatsapp }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Simulasi pembayaran gagal");
-      setOrder(data.order);
-      setCart([]);
-      setView("success");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Simulasi pembayaran gagal");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const orderItems = order?.items ?? cart.map((item) => ({
-    productNameSnapshot: item.productName,
-    variantNameSnapshot: cartVariantLabel(item),
-    priceSnapshot: item.price,
-    quantity: item.quantity,
-    subtotal: item.price * item.quantity,
-  }));
 
   if (view === "cart") {
     return (
@@ -294,7 +239,7 @@ export default function StorefrontClient() {
         cartCountValue={totalItems}
         onCartClick={() => setView("cart")}
         onBack={() => setView("store")}
-        onContinueShopping={() => setView("store")}
+        onContinueShopping={returnToCatalog}
         onCheckout={() => { if (cart.length) { setMessage(""); setView("checkout"); } else setMessage("Keranjang masih kosong."); }}
         onUpdateQuantity={updateCartQuantity}
         onRemove={removeFromCart}
@@ -313,34 +258,9 @@ export default function StorefrontClient() {
         setters={{ setBuyerName, setBuyerWhatsapp, setBuyerEmail, setNeedsInvoice, setInvoiceName, setCompanyName }}
         onBack={() => setView("cart")}
         onSubmit={createOrder}
+        paymentAvailable={Boolean(settings.qrisImageUrl)}
         message={message}
         submitting={submitting}
-      />
-    );
-  }
-
-  if (view === "payment" && order) {
-    return (
-      <Payment
-        items={orderItems}
-        order={order}
-        paymentUrl={paymentUrl}
-        onBack={() => setView("checkout")}
-        onCheck={checkStatus}
-        onSimulate={simulatePayment}
-        message={message}
-        submitting={submitting}
-      />
-    );
-  }
-
-  if (view === "success" && order) {
-    return (
-      <PaymentSuccess
-        items={orderItems}
-        order={order}
-        settings={settings}
-        onBack={() => setView("store")}
       />
     );
   }
@@ -375,11 +295,11 @@ export default function StorefrontClient() {
           <div><p className="text-sm font-black uppercase tracking-[.18em] text-[#b05e73]">Katalog</p><h2 className="mt-2 text-3xl font-black text-[#2A1620]">Pilih aplikasi</h2></div>
           <label className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#EBCBD2] bg-white px-4 md:w-80"><Search className="size-5 text-[#b57b88]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari produk..." className="w-full bg-transparent text-base outline-none" /></label>
         </div>
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-2">{categories.map((item) => <button key={item} onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold ${category === item ? "border-[#2A1620] bg-[#2A1620] text-white" : "border-[#EBCBD2] bg-white text-[#6c4653]"}`}>{item}</button>)}</div>
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-2">{categories.map((item) => <button key={item} onClick={() => { setCategory(item); setShowAllProducts(false); }} className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold ${category === item ? "border-[#2A1620] bg-[#2A1620] text-white" : "border-[#EBCBD2] bg-white text-[#6c4653]"}`}>{item}</button>)}</div>
         {message && <p className="mt-5 rounded-xl bg-[#fff3d6] p-4 text-sm font-semibold text-[#8a5c00]">{message}</p>}
         {loading ? <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-56 animate-pulse rounded-[24px] border border-[#EBCBD2] bg-white" />)}</div> : filtered.length ? (
           <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((product) => (
+            {displayedProducts.map((product) => (
               <article key={product.id} className="rounded-[24px] border border-[#EBCBD2] bg-white p-5 shadow-[0_8px_30px_rgba(87,38,57,.05)]">
                 <ProductIcon product={product} />
                 <p className="mt-5 text-xs font-black uppercase tracking-[.15em] text-[#b17684]">{product.category}</p>
@@ -395,6 +315,13 @@ export default function StorefrontClient() {
           <div className="mt-7 rounded-3xl border border-dashed border-[#d8aeb8] bg-white p-12 text-center">
             <p className="font-bold text-[#2A1620]">Belum ada produk aktif.</p>
             <p className="mt-1 text-sm text-[#6B7280]">Produk yang ditambahkan admin akan otomatis muncul di sini.</p>
+          </div>
+        )}
+        {!loading && category === "Semua" && !searchActive && filtered.length > 9 && (
+          <div className="mt-7 flex justify-center">
+            <Button type="button" variant="outline" onClick={() => setShowAllProducts((current) => !current)} className="h-12 w-full rounded-xl border-[#EBCBD2] bg-white px-6 text-[#2A1620] hover:bg-[#F2D8DE] sm:w-auto">
+              {showAllProducts ? "Tampilkan Lebih Sedikit ↑" : "Tampilkan Semuanya ↓"}
+            </Button>
           </div>
         )}
       </section>
@@ -521,7 +448,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
             <ShoppingCart className="mx-auto size-12 text-[#b57b88]" />
             <h1 className="mt-4 text-2xl font-black text-[#2A1620]">Keranjang masih kosong</h1>
             <p className="mt-2 text-sm text-[#6B7280]">Pilih produk dari katalog dan tambahkan ke keranjang.</p>
-            <Button onClick={onContinueShopping} className="mt-6 rounded-xl bg-[#2A1620] text-white">Lanjut Belanja</Button>
+            <Button onClick={onContinueShopping} className="mt-6 rounded-xl bg-[#2A1620] text-white">Kembali ke Katalog</Button>
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -529,7 +456,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
               {cart.map((item) => (
                 <article key={item.variantId} className="rounded-[24px] border border-[#EBCBD2] bg-white p-5 shadow-[0_8px_30px_rgba(87,38,57,.05)]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex gap-4">
+                    <div className="flex min-w-0 gap-4">
                     <ProductIcon
                       product={{
                         name: item.productName,
@@ -537,7 +464,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
                       }}
                       size="small"
                     />
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs font-black uppercase tracking-[.12em] text-[#b17684]">{item.category}</p>
                         <h2 className="mt-1 text-lg font-black text-[#2A1620]">{item.productName}</h2>
                         <p className="mt-1 text-sm text-[#6B7280]">{cartVariantLabel(item)}</p>
@@ -546,7 +473,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
                     </div>
                     <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
                       <div className="flex items-center gap-2 rounded-xl border border-[#EBCBD2] bg-[#FDF9FA] p-1">
-                        <button type="button" aria-label="Kurangi quantity" onClick={() => onUpdateQuantity(item.variantId, item.quantity - 1)} disabled={item.quantity <= 1} className="grid size-9 place-items-center rounded-lg text-[#2A1620] disabled:opacity-40"><Minus className="size-4" /></button>
+                        <button type="button" aria-label="Kurangi quantity" onClick={() => onUpdateQuantity(item.variantId, item.quantity - 1)} className="grid size-9 place-items-center rounded-lg text-[#2A1620]"><Minus className="size-4" /></button>
                         <span className="min-w-8 text-center text-sm font-black">{item.quantity}</span>
                         <button type="button" aria-label="Tambah quantity" onClick={() => onUpdateQuantity(item.variantId, item.quantity + 1)} disabled={item.quantity >= 99} className="grid size-9 place-items-center rounded-lg text-[#2A1620] disabled:opacity-40"><Plus className="size-4" /></button>
                       </div>
@@ -574,12 +501,11 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
               </div>
               <div className="mt-5 space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-[#6B7280]">Subtotal</span><strong>{rupiah(subtotal)}</strong></div>
-                <div className="flex justify-between"><span className="text-[#6B7280]">Biaya pembayaran</span><strong>{rupiah(PAYMENT_FEE)}</strong></div>
-                <div className="flex justify-between border-t border-[#EBCBD2] pt-4 text-lg"><strong>Total</strong><strong>{rupiah(grandTotal)}</strong></div>
+                <div className="flex justify-between border-t border-[#EBCBD2] pt-4 text-lg"><strong>Total produk</strong><strong>{rupiah(grandTotal)}</strong></div>
               </div>
               <Button onClick={onCheckout} className="mt-6 h-12 w-full rounded-xl bg-[#2A1620] text-white">Checkout Semua <ArrowRight /></Button>
-              <Button onClick={onContinueShopping} variant="outline" className="mt-3 h-11 w-full rounded-xl border-[#EBCBD2]">Lanjut Belanja</Button>
-              <Button asChild variant="ghost" className="mt-2 h-10 w-full rounded-xl text-[#6c4653]"><a href={chatLink} target="_blank" rel="noreferrer"><MessageCircle className="size-4" /> Tanya penjual</a></Button>
+              <Button onClick={onContinueShopping} variant="outline" className="mt-3 h-11 w-full rounded-xl border-[#EBCBD2]">Kembali ke Katalog</Button>
+              <Button asChild variant="ghost" className="mt-2 h-10 w-full rounded-xl text-[#6c4653]"><a href={chatLink} target="_blank" rel="noreferrer"><MessageCircle className="size-4" /> Tanya stok ke penjual</a></Button>
             </aside>
           </div>
         )}
@@ -588,7 +514,7 @@ function CartPage({ cart, subtotal, grandTotal, chatLink, cartCountValue, onCart
   );
 }
 
-function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmit, message, submitting }: {
+function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmit, paymentAvailable, message, submitting }: {
   cart: CartItem[];
   subtotal: number;
   grandTotal: number;
@@ -596,14 +522,15 @@ function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmi
   setters: { setBuyerName: (v: string) => void; setBuyerWhatsapp: (v: string) => void; setBuyerEmail: (v: string) => void; setNeedsInvoice: (v: boolean) => void; setInvoiceName: (v: string) => void; setCompanyName: (v: string) => void };
   onBack: () => void;
   onSubmit: () => void;
+  paymentAvailable: boolean;
   message: string;
   submitting: boolean;
 }) {
   return (
     <main className="min-h-screen bg-[#F8F0F1]">
       <MiniHeader label="Checkout" onBack={onBack} />
-      <div className="mx-auto grid max-w-6xl gap-6 px-5 py-9 lg:grid-cols-[1fr_360px]">
-        <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="rounded-[26px] border border-[#EBCBD2] bg-white p-6 sm:p-8">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-7 sm:px-5 sm:py-9 lg:grid-cols-[1fr_360px] lg:px-8">
+        <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="order-2 rounded-[26px] border border-[#EBCBD2] bg-white p-5 sm:p-8 lg:order-1">
           <h1 className="text-3xl font-black text-[#2A1620]">Data pembeli</h1>
           <p className="mt-2 text-sm text-[#6B7280]">Checkout sekali untuk {cart.length} produk dalam keranjang.</p>
           <div className="mt-7 grid gap-5 sm:grid-cols-2">
@@ -621,10 +548,11 @@ function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmi
               <Field label="Instansi / perusahaan" value={values.companyName} setValue={setters.setCompanyName} required={false} />
             </div>
           )}
+          {!paymentAvailable && <p className="mt-5 rounded-xl bg-[#fff3d6] p-3 text-sm font-semibold text-[#8a5c00]">Metode pembayaran QRIS belum tersedia. Silakan hubungi penjual.</p>}
           {message && <p className="mt-5 rounded-xl bg-[#fee2e2] p-3 text-sm font-semibold text-[#b91c1c]">{message}</p>}
-          <Button disabled={submitting} type="submit" className="mt-7 h-auto min-h-12 w-full whitespace-normal rounded-xl bg-[#2A1620] px-5 py-3 text-white sm:w-auto">{submitting ? "Membuat order..." : "Lanjut Pembayaran"} <ArrowRight /></Button>
+          <Button disabled={submitting || !paymentAvailable} type="submit" className="mt-7 h-auto min-h-12 w-full whitespace-normal rounded-xl bg-[#2A1620] px-5 py-3 text-white sm:w-auto">{submitting ? "Membuat order..." : "Lanjut Pembayaran"} <ArrowRight /></Button>
         </form>
-        <aside className="h-fit rounded-[24px] border border-[#EBCBD2] bg-white p-6">
+        <aside className="order-1 h-fit rounded-[24px] border border-[#EBCBD2] bg-white p-5 sm:p-6 lg:order-2">
           <h2 className="font-black text-[#2A1620]">Ringkasan pesanan</h2>
           <div className="mt-5 space-y-4 border-b border-[#EBCBD2] pb-5">
             {cart.map((item) => (
@@ -646,118 +574,10 @@ function Checkout({ cart, subtotal, grandTotal, values, setters, onBack, onSubmi
           </div>
           <div className="mt-5 space-y-3 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><strong>{rupiah(subtotal)}</strong></div>
-            <div className="flex justify-between"><span>Biaya pembayaran</span><strong>{rupiah(PAYMENT_FEE)}</strong></div>
-            <div className="flex justify-between border-t border-[#EBCBD2] pt-4 text-lg"><strong>Total</strong><strong>{rupiah(grandTotal)}</strong></div>
+            <div className="flex justify-between border-t border-[#EBCBD2] pt-4 text-lg"><strong>Total produk</strong><strong>{rupiah(grandTotal)}</strong></div>
           </div>
           <div className="mt-5 flex gap-3 rounded-2xl bg-[#F2D8DE] p-4 text-sm leading-5 text-[#714151]"><ShieldCheck className="mt-0.5 size-5 shrink-0" /> Satu invoice berisi semua item setelah pembayaran lunas.</div>
         </aside>
-      </div>
-    </main>
-  );
-}
-
-function Payment({ items, order, paymentUrl, onBack, onCheck, onSimulate, message, submitting }: {
-  items: OrderItem[];
-  order: Order;
-  paymentUrl: string;
-  onBack: () => void;
-  onCheck: () => void;
-  onSimulate: () => void;
-  message: string;
-  submitting: boolean;
-}) {
-  const isDevelopment = process.env.NODE_ENV !== "production";
-  return (
-    <main className="min-h-screen bg-[#F8F0F1]">
-      <MiniHeader label="Pembayaran" onBack={onBack} />
-      <div className="mx-auto w-full max-w-2xl px-3 py-5 min-[390px]:px-4 sm:px-5 sm:py-10">
-        <div className="rounded-[28px] border border-[#EBCBD2] bg-white p-7 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-[#fff3d6] px-4 py-2 text-sm font-black text-[#a66600]"><Clock3 className="size-4" /> Menunggu pembayaran</span>
-          <h1 className="mt-5 text-2xl font-black text-[#2A1620] sm:text-3xl">Selesaikan pembayaran</h1>
-          <div className="mx-auto mt-6 grid size-44 place-items-center rounded-[22px] border-2 border-[#2A1620] bg-[#F8F0F1] shadow-[7px_7px_0_#E9B8C2]"><QrCode className="size-28 text-[#2A1620]" /></div>
-          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-[#FDF8F9] p-5 text-left">
-            <p className="flex justify-between text-sm"><span>Order</span><strong>{order.orderNumber}</strong></p>
-            <div className="mt-4 space-y-2 border-t border-[#EBCBD2] pt-4 text-sm">
-              {items.map((item, index) => (
-                <p key={`${item.productNameSnapshot}-${index}`} className="flex justify-between gap-3">
-                  <span>{formatItemLine(item)} × {item.quantity}</span>
-                  <strong>{rupiah(item.subtotal)}</strong>
-                </p>
-              ))}
-              <p className="flex justify-between border-t border-[#EBCBD2] pt-3 text-base"><span>Total bayar</span><strong>{rupiah(order.total)}</strong></p>
-            </div>
-          </div>
-          {paymentUrl && <Button asChild className="mt-6 h-12 rounded-xl bg-[#2A1620] px-7"><a href={paymentUrl} target="_blank" rel="noreferrer">Buka Pembayaran QRIS <ArrowRight /></a></Button>}
-          <div className="mt-4 flex flex-col items-center gap-3">
-            <Button disabled={submitting} onClick={onCheck} variant="outline" className="rounded-xl border-[#EBCBD2]">{submitting ? "Memeriksa..." : "Cek Status Pembayaran"}</Button>
-            {isDevelopment && <Button disabled={submitting} onClick={onSimulate} className="rounded-xl bg-[#16A34A] text-white hover:bg-[#15803d]">{submitting ? "Memproses..." : "Simulasikan Pembayaran Berhasil"}</Button>}
-          </div>
-          {!paymentUrl && <p className="mt-4 text-xs text-[#6B7280]">QRIS belum tersedia. Status pembayaran hanya dapat dikonfirmasi oleh Admin.</p>}
-          {message && <p className="mt-4 text-sm font-semibold text-[#9a6672]">{message}</p>}
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function PaymentSuccess({ items, order, settings, onBack }: { items: OrderItem[]; order: Order; settings: Settings; onBack: () => void }) {
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
-  const invoicePath = `/invoice/${order.invoicePublicId}`;
-  const invoiceUrl = `${origin}${invoicePath}`;
-  const itemLines = items.map((item) => `${formatItemLine(item)} — ${rupiah(item.subtotal)}`).join("\n");
-  const chatMessage = [
-    "Halo kak, pembayaran saya sudah berhasil.",
-    "",
-    `Order: ${order.orderNumber}`,
-    `Invoice: ${order.invoiceNumber}`,
-    "",
-    "Item:",
-    itemLines,
-    "",
-    `Total: ${rupiah(order.total)}`,
-    "Status: LUNAS",
-    "",
-    `Invoice:\n${invoiceUrl}`,
-    "",
-    "Mohon diproses ya kak.",
-  ].join("\n");
-  const processLink = whatsappUrl(settings.whatsappNumber, chatMessage);
-
-  return (
-    <main className="min-h-screen bg-[#F8F0F1]">
-      <MiniHeader label="Pembayaran Berhasil" onBack={onBack} />
-      <div className="mx-auto max-w-2xl px-5 py-10">
-      <div className="min-w-0 rounded-[28px] border border-[#EBCBD2] bg-white p-4 min-[390px]:p-6 sm:p-9">
-          <div className="text-center">
-            <span className="mx-auto grid size-16 place-items-center rounded-full bg-[#dcfce7] text-[#16A34A]"><Check className="size-9 stroke-[3]" /></span>
-            <h1 className="mt-5 text-2xl font-black text-[#2A1620] sm:text-3xl">Pembayaran Berhasil</h1>
-            <p className="mt-2 text-sm text-[#6B7280]">Pembayaran telah diterima dan invoice sudah tersedia.</p>
-          </div>
-          <div className="mt-6 min-w-0 space-y-3 rounded-2xl bg-[#FDF8F9] p-4 text-sm min-[390px]:p-5">
-            <p className="flex justify-between gap-4"><span>Nomor order</span><strong className="text-right">{order.orderNumber}</strong></p>
-            <p className="flex justify-between gap-4"><span>Nomor invoice</span><strong className="text-right">{order.invoiceNumber}</strong></p>
-            <div className="border-t border-[#EBCBD2] pt-3">
-              <p className="mb-2 font-bold text-[#2A1620]">Item dibeli</p>
-              <div className="space-y-2">
-                {items.map((item, index) => (
-                  <p key={`${item.productNameSnapshot}-${index}`} className="flex justify-between gap-4">
-                    <span>{formatItemLine(item)} × {item.quantity}</span>
-                    <strong className="text-right">{rupiah(item.subtotal)}</strong>
-                  </p>
-                ))}
-              </div>
-            </div>
-            <p className="flex justify-between gap-4 border-t border-[#EBCBD2] pt-3 text-base"><span>Total pembayaran</span><strong className="text-right">{rupiah(order.total)}</strong></p>
-            <p className="flex justify-between gap-4"><span>Status</span><span className="rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-black text-[#15803d]">LUNAS</span></p>
-          </div>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2">
-          <Button asChild className="h-auto min-h-14 w-full whitespace-normal rounded-xl bg-[#16A34A] px-3 py-3 text-center text-sm font-black leading-5 text-white hover:bg-[#15803d] sm:col-span-2 sm:px-4 sm:text-base"><a href={processLink} target="_blank" rel="noreferrer"><MessageCircle />Kirim Bukti &amp; Proses via WhatsApp</a></Button>
-            <Button asChild className="h-12 rounded-xl bg-[#2A1620] text-white"><a href={invoicePath} target="_blank" rel="noreferrer"><BadgeCheck /> Lihat Invoice</a></Button>
-            <Button asChild variant="outline" className="h-12 rounded-xl border-[#EBCBD2]"><a href={`${invoicePath}?download=1`} target="_blank" rel="noreferrer"><Download /> Download Invoice PDF</a></Button>
-            <Button asChild variant="outline" className="h-11 rounded-xl border-[#EBCBD2] sm:col-span-2"><a href={`${invoicePath}?print=1`} target="_blank" rel="noreferrer"><Printer /> Print Invoice</a></Button>
-          </div>
-        </div>
       </div>
     </main>
   );

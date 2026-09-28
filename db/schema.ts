@@ -65,6 +65,7 @@ export const productVariants = sqliteTable("product_variants", {
 export const orders = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   orderNumber: text("order_number").notNull(),
+  publicOrderToken: text("public_order_token"),
   invoiceNumber: text("invoice_number").notNull(),
   invoicePublicId: text("invoice_public_id"),
   buyerName: text("buyer_name").notNull(),
@@ -77,11 +78,13 @@ export const orders = sqliteTable("orders", {
   paymentFee: integer("payment_fee").notNull().default(0),
   total: integer("total").notNull(),
   paymentMethod: text("payment_method").notNull().default("manual"),
+  paymentConfirmationMethod: text("payment_confirmation_method"),
+  confirmedByAdmin: integer("confirmed_by_admin"),
   paymentStatus: text("payment_status").notNull().default("pending"),
   orderStatus: text("order_status").notNull().default("menunggu_pembayaran"),
   paidAt: text("paid_at"),
   ...timestamps,
-}, (table) => [uniqueIndex("idx_orders_order_number").on(table.orderNumber), uniqueIndex("idx_orders_invoice_number").on(table.invoiceNumber), uniqueIndex("idx_orders_invoice_public_id").on(table.invoicePublicId), index("idx_orders_payment_status_created").on(table.paymentStatus, table.createdAt), index("idx_orders_order_status_created").on(table.orderStatus, table.createdAt)]);
+}, (table) => [uniqueIndex("idx_orders_order_number").on(table.orderNumber), uniqueIndex("idx_orders_public_order_token").on(table.publicOrderToken), uniqueIndex("idx_orders_invoice_number").on(table.invoiceNumber), uniqueIndex("idx_orders_invoice_public_id").on(table.invoicePublicId), index("idx_orders_payment_status_created").on(table.paymentStatus, table.createdAt), index("idx_orders_order_status_created").on(table.orderStatus, table.createdAt)]);
 
 export const orderItems = sqliteTable("order_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -99,15 +102,11 @@ export const payments = sqliteTable("payments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   orderId: integer("order_id").notNull().references(() => orders.id),
   provider: text("provider").notNull().default("manual"),
-  transactionId: text("transaction_id"),
   paymentType: text("payment_type"),
-  grossAmount: integer("gross_amount").notNull(),
-  feeAmount: integer("fee_amount").notNull().default(0),
   paymentStatus: text("payment_status").notNull().default("pending"),
-  rawResponse: text("raw_response", { mode: "json" }),
   paidAt: text("paid_at"),
   ...timestamps,
-}, (table) => [index("idx_payments_order_id").on(table.orderId), uniqueIndex("idx_payments_provider_transaction").on(table.provider, table.transactionId)]);
+}, (table) => [index("idx_payments_order_id").on(table.orderId)]);
 
 export const storeSettings = sqliteTable("store_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -118,6 +117,9 @@ export const storeSettings = sqliteTable("store_settings", {
   whatsappNumber: text("whatsapp_number").notNull().default(""),
   whatsappChannelUrl: text("whatsapp_channel_url").notNull().default(""),
   storeEmail: text("store_email"),
+  qrisImageUrl: text("qris_image_url"),
+  qrisAccountName: text("qris_account_name"),
+  paymentInstruction: text("payment_instruction").notNull().default("Scan QRIS di atas dan lakukan pembayaran sesuai total pesanan."),
   invoiceNote: text("invoice_note").notNull().default("Dokumen ini merupakan bukti pembelian yang sah"),
   ...timestamps,
 });

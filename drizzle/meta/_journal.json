@@ -29,6 +29,13 @@
       "when": 1790221200504,
       "tag": "0004_whatsapp_channel",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790310000000,
+      "tag": "0006_manual_qris",
+      "breakpoints": true
     }
   ]
 }

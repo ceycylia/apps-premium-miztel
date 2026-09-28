@@ -16,8 +16,6 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
       invoiceName: orders.invoiceName,
       companyName: orders.companyName,
       subtotal: orders.subtotal,
-      paymentFee: orders.paymentFee,
-      total: orders.total,
       paymentMethod: orders.paymentMethod,
       paymentStatus: orders.paymentStatus,
       paidAt: orders.paidAt,
