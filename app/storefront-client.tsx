@@ -73,7 +73,8 @@ function formatItemLine(item: Pick<CartItem, "productName" | "variantName" | "du
 
 function ProductIcon({ product, size = "normal" }: { product: Pick<Product, "name" | "imageUrl">; size?: "normal" | "small" }) {
   const dimensions = size === "small" ? "size-11 shrink-0 rounded-xl" : "size-14 shrink-0 rounded-[18px]";
-  if (product.imageUrl) return <img src={product.imageUrl} alt={`Icon ${product.name}`} className={`${dimensions} object-cover ring-1 ring-[#EBCBD2]`} />;
+  const [failed, setFailed] = useState(false);
+  if (product.imageUrl && !failed) return <img src={product.imageUrl} alt={`Icon ${product.name}`} onError={() => setFailed(true)} className={`${dimensions} object-cover ring-1 ring-[#EBCBD2]`} />;
   return <span className={`grid ${dimensions} place-items-center bg-[#2A1620] text-lg font-black text-white`}>{product.name?.slice(0, 1).toUpperCase() || "?"}</span>;
 }
 

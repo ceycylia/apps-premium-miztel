@@ -1,8 +1,8 @@
-import { env } from "cloudflare:workers";
 import { asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { storeSettings } from "@/db/schema";
 import { getAuthenticatedAdmin, verifyAdminPassword } from "@/lib/admin-auth";
+import { normalizeGoogleDriveImageUrl } from "@/lib/product-image";
 
 function normalizeChannelUrl(value?: string) {
   const raw = value?.trim() ?? "";
@@ -11,15 +11,6 @@ function normalizeChannelUrl(value?: string) {
   const parsed = new URL(candidate);
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error("Link Channel WhatsApp harus berupa URL yang valid");
   return parsed.toString();
-}
-
-function qrisAssetKey(value?: string) {
-  const url = value?.trim() ?? "";
-  if (!url) return null;
-  if (!url.startsWith("/api/assets/")) throw new Error("Gambar QRIS harus berasal dari upload Admin Settings");
-  const key = decodeURIComponent(url.slice("/api/assets/".length));
-  if (!key.startsWith("qris/")) throw new Error("Gambar QRIS tidak valid");
-  return key;
 }
 
 const defaultSettings = {
@@ -52,9 +43,8 @@ export async function PUT(request: Request) {
     let whatsappChannelUrl = "";
     try { whatsappChannelUrl = normalizeChannelUrl(body.whatsappChannelUrl); }
     catch { return Response.json({ error: "Link Channel WhatsApp tidak valid" }, { status: 400 }); }
-    let nextQrisKey: string | null = null;
-    try { nextQrisKey = qrisAssetKey(body.qrisImageUrl); }
-    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Gambar QRIS tidak valid" }, { status: 400 }); }
+    const qrisImage = normalizeGoogleDriveImageUrl(body.qrisImageUrl ?? "");
+    if (qrisImage.error || !qrisImage.url) return Response.json({ error: qrisImage.error ?? "Link gambar QRIS Google Drive wajib diisi" }, { status: 400 });
     const db = getDb();
     const [count] = await db.select({ value: sql<number>`count(*)` }).from(storeSettings);
     const [currentSettings] = await db.select().from(storeSettings).orderBy(asc(storeSettings.id)).limit(1);
@@ -65,7 +55,7 @@ export async function PUT(request: Request) {
       storePhone: body.storePhone?.trim() || whatsapp,
       storeEmail: body.storeEmail?.trim() || null,
       storeAddress: body.storeAddress?.trim() || null,
-      qrisImageUrl: nextQrisKey ? `/api/assets/${encodeURIComponent(nextQrisKey)}` : null,
+      qrisImageUrl: qrisImage.url,
       qrisAccountName: body.qrisAccountName?.trim().slice(0, 100) || null,
       paymentInstruction: body.paymentInstruction?.trim().slice(0, 500) || defaultSettings.paymentInstruction,
       invoiceNote: body.invoiceNote?.trim() || defaultSettings.invoiceNote,
@@ -74,11 +64,6 @@ export async function PUT(request: Request) {
     if (Number(count?.value ?? 0) === 0) await db.insert(storeSettings).values(values);
     else if (currentSettings) await db.update(storeSettings).set(values).where(eq(storeSettings.id, currentSettings.id));
 
-    const previousQrisKey = currentSettings?.qrisImageUrl ? qrisAssetKey(currentSettings.qrisImageUrl) : null;
-    if (env.BUCKET && previousQrisKey && previousQrisKey !== nextQrisKey) {
-      try { await env.BUCKET.delete(previousQrisKey); }
-      catch (error) { console.error("Gagal menghapus QRIS lama dari R2", { key: previousQrisKey, error: error instanceof Error ? error.message : "Unknown error" }); }
-    }
     return Response.json({ success: true });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Pengaturan gagal disimpan" }, { status: 500 });

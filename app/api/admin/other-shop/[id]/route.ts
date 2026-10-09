@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { otherShopItems } from "@/db/schema";
 import { getAuthenticatedAdmin } from "@/lib/admin-auth";
+import { normalizeProductImageUrl } from "@/lib/product-image";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -9,7 +10,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const id = Number((await context.params).id);
     const body = await request.json() as { title?: string; imageUrl?: string; isActive?: boolean };
     if (!Number.isInteger(id) || !body.title?.trim() || !body.imageUrl?.trim()) return Response.json({ error: "Data Other Shop tidak valid" }, { status: 400 });
-    await getDb().update(otherShopItems).set({ title: body.title.trim(), imageUrl: body.imageUrl.trim(), isActive: body.isActive !== false, updatedAt: new Date().toISOString() }).where(eq(otherShopItems.id, id));
+    const image = normalizeProductImageUrl(body.imageUrl);
+    if (image.error || !image.url) return Response.json({ error: image.error ?? "Link gambar tidak valid" }, { status: 400 });
+    await getDb().update(otherShopItems).set({ title: body.title.trim(), imageUrl: image.url, isActive: body.isActive !== false, updatedAt: new Date().toISOString() }).where(eq(otherShopItems.id, id));
     return Response.json({ success: true });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Item Other Shop gagal diperbarui" }, { status: 500 });

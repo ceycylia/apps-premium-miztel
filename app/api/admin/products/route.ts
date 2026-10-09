@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { products, productVariants } from "@/db/schema";
 import { getAuthenticatedAdmin } from "@/lib/admin-auth";
+import { normalizeProductImageUrl } from "@/lib/product-image";
 
 const categories = ["Music Apps", "Editing Apps", "Streaming Apps", "Other Apps"];
 
@@ -26,8 +27,10 @@ export async function POST(request: Request) {
     if (!admin) return Response.json({ error: "Sesi admin berakhir" }, { status: 401 });
     const body = await request.json() as { name?: string; category?: string; description?: string; imageUrl?: string; variants?: { name?: string; price?: number }[] };
     if (!validPayload(body)) return Response.json({ error: "Nama, kategori, dan minimal satu paket valid wajib diisi" }, { status: 400 });
+    const image = normalizeProductImageUrl(body.imageUrl);
+    if (image.error) return Response.json({ error: image.error }, { status: 400 });
     const db = getDb();
-    const [product] = await db.insert(products).values({ name: body.name!.trim(), slug: `${slugify(body.name!)}-${Date.now().toString().slice(-6)}`, category: body.category!, description: body.description?.trim() ?? "", imageUrl: body.imageUrl?.trim() || null }).returning();
+    const [product] = await db.insert(products).values({ name: body.name!.trim(), slug: `${slugify(body.name!)}-${Date.now().toString().slice(-6)}`, category: body.category!, description: body.description?.trim() ?? "", imageUrl: image.url || null }).returning();
     try {
       await db.insert(productVariants).values(body.variants!.map((variant) => ({ productId: product.id, variantName: variant.name!.trim(), durationLabel: "", price: Number(variant.price) })));
     } catch (error) {
